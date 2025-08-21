@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beautiful PDF Flipbook</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/page-flip/dist/css/page-flip.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body,
+        html {
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .file-upload-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50px;
+            color: white;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .file-input-label:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .upload-icon {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: white;
+            max-width: 400px;
+        }
+
+        .empty-state h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .empty-state p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            line-height: 1.6;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        #flipbook {
+            width: 100%;
+            height: 100%;
+            max-width: 1200px;
+            max-height: 800px;
+            display: none;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #flipbook.visible {
+            display: block;
+            animation: fadeInScale 0.6s ease-out;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .loading.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            color: white;
+            font-size: 1.1rem;
+            margin-left: 1rem;
+        }
+
+        .debug-info {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            display: none;
+        }
+
+        .text-extraction-panel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(0, 0, 0, 0.1);
+            transition: right 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .text-extraction-panel.open {
+            right: 0;
+        }
+
+        .panel-header {
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .page-text {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .page-text h4 {
+            margin-bottom: 0.5rem;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.5rem;
+        }
+
+        .page-text p {
+            line-height: 1.6;
+            color: #555;
+            margin-bottom: 0.5rem;
+            user-select: text;
+            cursor: text;
+        }
+
+        .extract-text-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            color: white;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .extract-text-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .close-panel {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 0.5rem;
+        }
+
+        .copy-all-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 1rem;
+        }
+
+        .copy-all-btn:hover {
+            background: #5a6fd8;
+        }
+
+        @media (max-width: 768px) {
+            .text-extraction-panel {
+                width: 100%;
+                right: -100%;
+            }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .logo {
+                font-size: 1.2rem;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+
+            .empty-state h2 {
+                font-size: 1.5rem;
+            }
+
+            .empty-state p {
+                font-size: 1rem;
+            }
+
+            #flipbook {
+                max-height: 70vh;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                padding: 0.75rem;
+            }
+
+            .file-input-label {
+                padding: 0.5rem 1rem;
+                font-size: 0.9rem;
+            }
+
+            .main-content {
+                padding: 0.5rem;
+            }
+
+            #flipbook {
+                max-height: 60vh;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">📖 PDF Flipbook</div>
+            <div class="file-upload-container">
+                <button class="extract-text-btn" id="extractTextBtn" style="display: none;">
+                    📝 Extract Text
+                </button>
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" accept=".pdf" />
+                    <label for="fileInput" class="file-input-label">
+                        <svg class="upload-icon" viewBox="0 0 24 24">
+                            <path
+                                d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                        </svg>
+                        Choose PDF
+                    </label>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="empty-state" id="emptyState">
+                <h2>Welcome to PDF Flipbook</h2>
+                <p>Upload a PDF file to start reading with our beautiful flipbook interface. Experience your documents
+                    like never before with smooth page transitions and responsive design.</p>
+            </div>
+            <div id="flipbook"></div>
+        </main>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div class="loading-text">Processing PDF...</div>
+        </div>
+
+        <div class="debug-info" id="debugInfo"></div>
+
+        <!-- Text Extraction Panel -->
+        <div class="text-extraction-panel" id="textPanel">
+            <div class="panel-header">
+                <h3>📝 Extracted Text</h3>
+                <button class="close-panel" id="closePanel">&times;</button>
+            </div>
+            <div class="panel-content">
+                <button class="copy-all-btn" id="copyAllBtn">📋 Copy All Text</button>
+                <div id="extractedText"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.min.js"></script>
+    <script>
+        // Configure PDF.js with maximum compatibility
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+        }
+
+        const fileInput = document.getElementById("fileInput");
+        const flipbookEl = document.getElementById("flipbook");
+        const emptyState = document.getElementById("emptyState");
+        const loading = document.getElementById("loading");
+        const debugInfo = document.getElementById("debugInfo");
+        const extractTextBtn = document.getElementById("extractTextBtn");
+        const textPanel = document.getElementById("textPanel");
+        const closePanel = document.getElementById("closePanel");
+        const copyAllBtn = document.getElementById("copyAllBtn");
+        const extractedTextEl = document.getElementById("extractedText");
+
+        let pageFlip;
+        let pdfDocument = null;
+        let extractedPages = [];
+
+        function debug(message) {
+            console.log(message);
+            debugInfo.textContent = message;
+            debugInfo.style.display = 'block';
+            setTimeout(() => {
+                debugInfo.style.display = 'none';
+            }, 3000);
+        }
+
+        function initializeFlipbook() {
+            try {
+                const isMobile = window.innerWidth <= 768;
+                const containerWidth = flipbookEl.offsetWidth || 800;
+                const containerHeight = flipbookEl.offsetHeight || 600;
+
+                // Use very safe, fixed dimensions
+                const flipbookWidth = isMobile ? 280 : 350;
+                const flipbookHeight = isMobile ? 350 : 450;
+
+                debug(`Creating flipbook: ${flipbookWidth}x${flipbookHeight}`);
+
+                pageFlip = new St.PageFlip(flipbookEl, {
+                    width: flipbookWidth,
+                    height: flipbookHeight,
+                    size: "fixed",
+                    minWidth: 200,
+                    maxWidth: 500,
+                    maxHeight: 600,
+                    showCover: true,
+                    mobileScrollSupport: true,
+                    swipeDistance: 30,
+                    clickEventForward: true,
+                    usePortrait: isMobile,
+                    startZIndex: 0,
+                    autoSize: false,
+                    maxShadowOpacity: 0.5,
+                    showPageCorners: true,
+                    disableFlipByClick: false
+                });
+
+                debug('PageFlip instance created successfully');
+
+            } catch (error) {
+                debug(`Flipbook init error: ${error.message}`);
+                throw error;
+            }
+        }
+
+        function createFallbackView(pages) {
+            debug('Creating fallback scrollable view...');
+
+            flipbookEl.innerHTML = `
+        <div style="
+          width: 100%;
+          height: 100%;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 20px;
+          padding: 20px;
+          background: white;
+          border-radius: 10px;
+        ">
+          ${pages.map((page, index) => `
+            <img 
+              src="${page}" 
+              alt="Page ${index + 1}"
+              style="
+                max-width: 100%;
+                height: auto;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                border-radius: 5px;
+              "
+            />
+          `).join('')}
+        </div>
+      `;
+
+            showFlipbook();
+            debug('Fallback view created successfully!');
+
+            // Show extract text button
+            extractTextBtn.style.display = 'block';
+        }
+
+        // Text extraction functionality
+        async function extractAllText() {
+            if (!pdfDocument) {
+                alert('No PDF loaded');
+                return;
+            }
+
+            extractedTextEl.innerHTML = '<div style="text-align: center; padding: 2rem;">Extracting text...</div>';
+            textPanel.classList.add('open');
+
+            try {
+                extractedPages = [];
+                let allText = '';
+
+                for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+                    const page = await pdfDocument.getPage(pageNum);
+                    const textContent = await page.getTextContent();
+
+                    let pageText = '';
+                    textContent.items.forEach(item => {
+                        if (item.str) {
+                            pageText += item.str + ' ';
+                        }
+                    });
+
+                    pageText = pageText.trim();
+                    extractedPages.push({
+                        pageNum,
+                        text: pageText
+                    });
+
+                    allText += pageText + '\n\n';
+                }
+
+                // Display extracted text
+                extractedTextEl.innerHTML = extractedPages.map(page => `
+          <div class="page-text">
+            <h4>Page ${page.pageNum}</h4>
+            <p>${page.text || 'No text found on this page'}</p>
+          </div>
+        `).join('');
+
+            } catch (error) {
+                extractedTextEl.innerHTML = `<div style="color: red; padding: 1rem;">Error extracting text: ${error.message}</div>`;
+            }
+        }
+
+        function copyAllText() {
+            const allText = extractedPages.map(page =>
+                `=== Page ${page.pageNum} ===\n${page.text}\n\n`
+            ).join('');
+
+            navigator.clipboard.writeText(allText).then(() => {
+                copyAllBtn.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    copyAllBtn.textContent = '📋 Copy All Text';
+                }, 2000);
+            }).catch(err => {
+                alert('Failed to copy text to clipboard');
+            });
+        }
+
+        // Event listeners
+        extractTextBtn.addEventListener('click', extractAllText);
+        closePanel.addEventListener('click', () => {
+            textPanel.classList.remove('open');
+        });
+        copyAllBtn.addEventListener('click', copyAllText);
+
+        function showLoading() {
+            loading.classList.add("active");
+        }
+
+        function hideLoading() {
+            loading.classList.remove("active");
+        }
+
+        function showFlipbook() {
+            emptyState.style.display = "none";
+            flipbookEl.classList.add("visible");
+        }
+
+        // Create high-quality canvas
+        function createHighQualityCanvas(width, height) {
+            const canvas = document.createElement('canvas');
+            const pixelRatio = window.devicePixelRatio || 1;
+
+            // Use device pixel ratio for crisp rendering
+            canvas.width = width * pixelRatio;
+            canvas.height = height * pixelRatio;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+
+            const ctx = canvas.getContext('2d');
+            ctx.scale(pixelRatio, pixelRatio);
+
+            return { canvas, context: ctx, pixelRatio };
+        }
+
+        fileInput.addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+                alert('Please select a valid PDF file.');
+                return;
+            }
+
+            showLoading();
+            debug('Starting PDF processing...');
+
+            try {
+                // Check if PDF.js is available
+                if (typeof pdfjsLib === 'undefined') {
+                    throw new Error('PDF.js library not loaded');
+                }
+
+                debug('Reading file...');
+                const arrayBuffer = await file.arrayBuffer();
+
+                debug('Loading PDF document...');
+                const loadingTask = pdfjsLib.getDocument({
+                    data: new Uint8Array(arrayBuffer),
+                    verbosity: 0,
+                    isEvalSupported: false,
+                    disableAutoFetch: true,
+                    disableStream: true,
+                    disableRange: true
+                });
+
+                const pdf = await loadingTask.promise;
+                pdfDocument = pdf; // Store for text extraction
+                debug(`PDF loaded: ${pdf.numPages} pages`);
+
+                if (!pdf || pdf.numPages === 0) {
+                    throw new Error('PDF has no pages');
+                }
+
+                const pages = [];
+
+                for (let pageNumber = 1; pageNumber <= Math.min(pdf.numPages, 50); pageNumber++) {
+                    try {
+                        debug(`Processing page ${pageNumber}...`);
+
+                        const page = await pdf.getPage(pageNumber);
+
+                        // Use higher quality scale
+                        const isMobile = window.innerWidth <= 768;
+                        const baseScale = isMobile ? 1.5 : 2.0;
+
+                        debug(`Getting viewport for page ${pageNumber}...`);
+                        let viewport;
+                        try {
+                            viewport = page.getViewport({ scale: baseScale });
+                        } catch (viewportError) {
+                            debug(`Viewport error on page ${pageNumber}: ${viewportError.message}`);
+                            continue;
+                        }
+
+                        debug(`Page ${pageNumber} viewport: ${viewport.width}x${viewport.height}`);
+
+                        // Calculate optimal canvas size while maintaining aspect ratio
+                        const maxWidth = isMobile ? 600 : 800;
+                        const maxHeight = isMobile ? 800 : 1000;
+
+                        let canvasWidth = viewport.width;
+                        let canvasHeight = viewport.height;
+
+                        // Scale down if too large, but maintain aspect ratio
+                        if (canvasWidth > maxWidth || canvasHeight > maxHeight) {
+                            const scaleX = maxWidth / canvasWidth;
+                            const scaleY = maxHeight / canvasHeight;
+                            const scale = Math.min(scaleX, scaleY);
+
+                            canvasWidth = Math.floor(canvasWidth * scale);
+                            canvasHeight = Math.floor(canvasHeight * scale);
+                        }
+
+                        // Ensure minimum readable size
+                        canvasWidth = Math.max(canvasWidth, 400);
+                        canvasHeight = Math.max(canvasHeight, 500);
+
+                        // Create high-quality canvas
+                        const { canvas, context, pixelRatio } = createHighQualityCanvas(canvasWidth, canvasHeight);
+
+                        if (!context) {
+                            debug(`No context for page ${pageNumber}`);
+                            continue;
+                        }
+
+                        // Fill with white background
+                        context.fillStyle = '#FFFFFF';
+                        context.fillRect(0, 0, canvasWidth, canvasHeight);
+
+                        // Calculate scale for the final render
+                        const renderScale = Math.min(canvasWidth / page.getViewport({ scale: 1 }).width,
+                            canvasHeight / page.getViewport({ scale: 1 }).height);
+
+                        const renderViewport = page.getViewport({ scale: renderScale });
+
+                        debug(`Rendering page ${pageNumber} at ${canvasWidth}x${canvasHeight}...`);
+
+                        const renderContext = {
+                            canvasContext: context,
+                            viewport: renderViewport
+                        };
+
+                        await page.render(renderContext).promise;
+
+                        // Use higher quality JPEG compression
+                        const imageData = canvas.toDataURL('image/jpeg', 0.92);
+                        pages.push(imageData);
+
+                        debug(`Page ${pageNumber} completed at high quality`);
+
+                    } catch (pageError) {
+                        debug(`Page ${pageNumber} error: ${pageError.message}`);
+                        continue;
+                    }
+                }
+
+                if (pages.length === 0) {
+                    throw new Error('No pages could be processed');
+                }
+
+                debug(`Successfully processed ${pages.length} pages`);
+
+                // Initialize flipbook with error handling
+                try {
+                    flipbookEl.innerHTML = "";
+                    debug('Initializing flipbook...');
+
+                    // Wait a moment for DOM to update
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                    initializeFlipbook();
+                    debug('Flipbook created, loading images...');
+
+                    pageFlip.loadFromImages(pages);
+                    debug('Images loaded, showing flipbook...');
+
+                    showFlipbook();
+                    debug('Flipbook initialized successfully!');
+
+                    // Show extract text button
+                    extractTextBtn.style.display = 'block';
+
+                } catch (flipbookError) {
+                    debug(`Flipbook error: ${flipbookError.message}`);
+                    // Fallback: show pages in a simple scrollable view
+                    createFallbackView(pages);
+                }
+
+            } catch (error) {
+                debug(`Error: ${error.message}`);
+                console.error('PDF processing failed:', error);
+
+                let errorMessage = 'Failed to process PDF: ';
+                if (error.message.includes('PDF.js library')) {
+                    errorMessage += 'PDF viewer not loaded properly.';
+                } else if (error.message.includes('Invalid PDF')) {
+                    errorMessage += 'Invalid or corrupted PDF file.';
+                } else {
+                    errorMessage += 'Please try a different PDF file.';
+                }
+
+                alert(errorMessage);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Handle window resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (pageFlip && flipbookEl.classList.contains('visible')) {
+                    initializeFlipbook();
+                    pageFlip.updateView();
+                }
+            }, 250);
+        });
+
+        // Check if PDF.js loaded
+        window.addEventListener('load', () => {
+            if (typeof pdfjsLib === 'undefined') {
+                alert('PDF viewer failed to load. Please refresh the page and try again.');
+            }
+        });
+    </script>
+</body>
+
+</html>
